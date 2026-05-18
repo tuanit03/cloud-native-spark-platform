@@ -1,0 +1,60 @@
+minio:
+  nameOverride: "minio"
+  namespaceOverride: ""
+  fullnameOverride: "minio"
+  clusterDomain: cluster.local
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/minio
+    tag: 2025.7.23-debian-12-r3
+    digest: ""
+    pullPolicy: IfNotPresent
+  defaultInitContainers:
+    volumePermissions:
+      enabled: false
+      image:
+        registry: docker.io
+        repository: bitnamilegacy/os-shell
+        tag: 12-debian-12-r50
+        digest: ""
+        pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    ports:
+      api: 9000
+  auth:
+    rootUser: admin
+    rootPassword: "admin123"
+    existingSecret: ""
+    rootUserSecretKey: ""
+    rootPasswordSecretKey: ""
+    forcePassword: false
+    usePasswordFiles: true
+    useSecret: true
+    forceNewKeys: false
+  defaultBuckets: "spark-bucket"
+  mode: standalone
+  resourcesPreset: "micro"
+  resources: {}
+  initContainers: []
+  persistence:
+    enabled: true
+    storageClass: ""
+    mountPath: /bitnami/minio/data
+    accessModes:
+      - ReadWriteOnce
+    size: 2Gi
+    annotations: {}
+    existingClaim: ""
+    selector: {}
+    dataSource: {}
+  console:
+    enabled: false
+  provisioning:
+    enabled: true
+    buckets:
+      - name: spark-bucket
+        versioning: false
+        withLock: false
+    extraCommands:
+      - "touch /tmp/.keep && mc cp /tmp/.keep provisioning/spark-bucket/logs/.keep"

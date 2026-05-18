@@ -1,0 +1,30 @@
+argo-workflows:
+  images:
+    tag: ""
+    pullPolicy: IfNotPresent
+    pullSecrets: []
+
+spark-operator:
+  image:
+    registry: ghcr.io
+    repository: kubeflow/spark-operator/controller
+    tag: ""
+    pullPolicy: IfNotPresent
+    pullSecrets: []
+
+minio:
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/minio
+    tag: 2025.7.23-debian-12-r3
+    digest: ""
+    pullPolicy: IfNotPresent
+
+spark:
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/spark
+    tag: 4.0.0-debian-12-r20
+    digest: ""
+    pullPolicy: IfNotPresent
+    pullSecrets: []

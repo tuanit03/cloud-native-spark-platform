@@ -1,0 +1,113 @@
+argo-workflows:
+  images:
+    tag: ""
+    pullPolicy: IfNotPresent
+    pullSecrets: []
+
+  crds:
+    install: true
+    keep: false
+    full: false               
+    annotations: {}
+
+  createAggregateRoles: true
+
+  nameOverride:
+  fullnameOverride:
+  namespaceOverride: ""
+  commonLabels: {}
+  kubeVersionOverride: ""
+
+  apiVersionOverrides:
+    autoscaling: ""
+    cloudgoogle: ""
+    monitoring: ""
+
+  singleNamespace: false
+
+  controller:
+    image:
+      registry: quay.io
+      repository: argoproj/workflow-controller
+      tag: ""
+    parallelism: 10    
+    workflowDefaults:
+      spec:
+        serviceAccountName: workflow-sa       
+    resourceRateLimit:
+      limit: 10
+      burst: 1
+    name: workflow-controller
+    workflowNamespaces:
+      - spark-jobs
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi         
+    extraEnv: []
+    extraArgs: []
+    volumeMounts: []
+    volumes: []
+    replicas: 1
+    revisionHistoryLimit: 3  
+
+  executor:
+    image:
+      registry: quay.io
+      repository: argoproj/argoexec
+      tag: ""
+      pullPolicy: IfNotPresent
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+    args: []
+    env: []
+    securityContext: {}
+
+  server:
+    enabled: true
+    baseHref: /
+    image:
+      registry: quay.io
+      repository: argoproj/argocli
+      tag: ""
+    name: server
+    serviceType: ClusterIP  
+    servicePort: 2746
+    serviceTargetPort: 2746
+    servicePortName: ""
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 300m
+        memory: 256Mi
+    replicas: 1
+    revisionHistoryLimit: 3
+
+    authModes:
+      - server
+    extraArgs:
+      - --auth-mode=server
+
+    tmpVolume:
+      emptyDir: {}
+    volumeMounts: []
+    volumes: []
+
+    clusterWorkflowTemplates:
+      enabled: true
+      enableEditing: true
+
+    extraContainers: []
+    extraInitContainers: []
+    lifecycle: {}
+    terminationGracePeriodSeconds: 30

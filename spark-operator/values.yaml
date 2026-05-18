@@ -1,0 +1,87 @@
+spark-operator:
+  nameOverride: ""
+  fullnameOverride: ""
+  commonLabels: {}
+
+  image:
+    registry: ghcr.io
+    repository: kubeflow/spark-operator/controller
+    tag: ""
+    pullPolicy: IfNotPresent
+    pullSecrets: []
+
+  controller:
+    replicas: 1
+    revisionHistoryLimit: 3
+    workers: 3
+    uiService:
+      enable: false
+
+    batchScheduler:
+      enable: false
+
+    volumes:
+    - name: tmp
+      emptyDir:
+        sizeLimit: 1Gi
+
+    env: []
+    envFrom: []
+
+    volumeMounts:
+    - name: tmp
+      mountPath: "/tmp"
+      readOnly: false
+
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 100m
+        memory: 256Mi
+
+    sidecars: []
+
+  webhook:
+    enable: true
+    replicas: 1
+    revisionHistoryLimit: 3
+    port: 9443
+    portName: webhook
+
+    resourceQuotaEnforcement:
+      enable: false
+
+    sidecars: []
+
+    volumes:
+    - name: serving-certs
+      emptyDir:
+        sizeLimit: 500Mi
+
+    env: []
+    envFrom: []
+
+    volumeMounts:
+    - name: serving-certs
+      mountPath: /etc/k8s-webhook-server/serving-certs
+      subPath: serving-certs
+      readOnly: false
+
+    resources:
+      limits:
+        cpu: 200m
+        memory: 256Mi
+      requests:
+        cpu: 50m
+        memory: 128Mi
+
+  spark:
+    jobNamespaces:
+    - spark-jobs
+    jobNamespaceSelector: ""
+
+  prometheus:
+    metrics:
+      enable: false

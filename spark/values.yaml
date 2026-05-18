@@ -1,0 +1,136 @@
+spark:
+  nameOverride: "spark-history-server"
+  fullnameOverride: "spark-history-server"
+  namespaceOverride: ""
+
+  clusterDomain: cluster.local
+
+  extraDeploy: []
+  initScripts: {}
+  initScriptsCM: ""
+  initScriptsSecret: ""
+
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/spark
+    tag: 4.0.0-debian-12-r20
+    digest: ""
+    pullPolicy: IfNotPresent
+    pullSecrets: []
+
+  master:
+    enabled: true
+    existingConfigmap: ""
+    containerPorts:
+      http: 18080
+      https: 8480
+      cluster: 7077
+
+    command: ["/bin/bash", "-c"]
+    args:
+      - |
+        source /opt/bitnami/scripts/spark-env.sh
+        echo "Listing jars..."
+        ls -lh /opt/bitnami/spark/extra-jars
+        export SPARK_DAEMON_CLASSPATH="/opt/bitnami/spark/extra-jars/hadoop-aws-3.4.1.jar:/opt/bitnami/spark/extra-jars/bundle-2.33.0.jar:/opt/bitnami/spark/extra-jars/spark-sql-kafka-0-10_2.13-4.0.0.jar"
+        echo "SPARK_DAEMON_CLASSPATH=${SPARK_DAEMON_CLASSPATH}"
+        exec /opt/bitnami/spark/bin/spark-class org.apache.spark.deploy.history.HistoryServer
+
+    extraEnvVars:
+      - name: SPARK_HISTORY_OPTS
+        value: >-
+          -Dspark.eventLog.enabled=true
+          -Dspark.history.fs.logDirectory=s3a://spark-bucket/logs
+          -Dspark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem
+          -Dspark.hadoop.fs.s3a.endpoint=http://minio:9000
+          -Dspark.hadoop.fs.s3a.access.key=admin
+          -Dspark.hadoop.fs.s3a.secret.key=admin123
+          -Dspark.hadoop.fs.s3a.path.style.access=true
+          -Dspark.hadoop.fs.s3a.connection.ssl.enabled=false
+          -Dspark.hadoop.fs.s3a.credentials.provider=org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider
+          -Dspark.history.fs.update.interval=10s
+          -Dspark.history.ui.port=18080
+          -Dspark.history.fs.cleaner.enabled=true
+          -Dspark.history.fs.cleaner.interval=1h
+          -Dspark.history.fs.cleaner.maxAge=1d
+          -Dspark.eventLog.compress=true
+          -Dspark.history.fs.inProgressOptimization.enabled=true
+          
+    extraVolumes:
+      - name: passwd-volume
+        emptyDir: {}
+      - name: extra-jars-volume
+        emptyDir: {}
+
+    extraVolumeMounts:
+      - name: passwd-volume
+        mountPath: /etc/passwd
+        subPath: passwd
+      - name: extra-jars-volume
+        mountPath: /opt/bitnami/spark/extra-jars
+
+    initContainers:
+      - name: setup-passwd
+        image: busybox:1.36
+        command:
+          - sh
+          - -c
+          - |
+            cp /etc/passwd /work/passwd
+            echo 'spark:x:1001:1001:Spark User:/opt/bitnami/spark:/bin/bash' >> /work/passwd
+        volumeMounts:
+          - name: passwd-volume
+            mountPath: /work
+
+      - name: download-s3-jars
+        image: curlimages/curl:8.11.1
+        env:
+          - name: HTTP_PROXY
+            value:
+          - name: HTTPS_PROXY
+            value:
+          - name: http_proxy
+            value:
+          - name: https_proxy
+            value:
+        command:
+          - sh
+          - -c
+          - |
+            set -e
+            echo "Downloading AWS S3 dependencies..."
+            curl -fL https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/3.4.1/hadoop-aws-3.4.1.jar -o /opt/bitnami/spark/extra-jars/hadoop-aws-3.4.1.jar
+            curl -fL https://repo1.maven.org/maven2/software/amazon/awssdk/bundle/2.33.0/bundle-2.33.0.jar -o /opt/bitnami/spark/extra-jars/bundle-2.33.0.jar
+            curl -fL https://repo1.maven.org/maven2/org/apache/spark/spark-sql-kafka-0-10_2.13/4.0.0/spark-sql-kafka-0-10_2.13-4.0.0.jar -o /opt/bitnami/spark/extra-jars/spark-sql-kafka-0-10_2.13-4.0.0.jar
+            ls -lh /opt/bitnami/spark/extra-jars
+        volumeMounts:
+          - name: extra-jars-volume
+            mountPath: /opt/bitnami/spark/extra-jars
+
+      - name: wait-for-minio
+        image: busybox:1.36
+        imagePullPolicy: IfNotPresent
+        command:
+          - sh
+          - -c
+          - |
+            echo "Waiting for minio:9000..."
+            until nc -z minio 9000; do
+              echo "minio not ready - sleeping 2s"
+              sleep 2
+            done
+            echo "minio is reachable"
+
+  worker:
+    enabled: false
+
+  security:
+    passwordsSecretName: ""
+    storageEncryptionEnabled: false
+
+  service:
+    type: ClusterIP
+    ports:
+      http: 18080
+      https: 443
+      cluster: 7077

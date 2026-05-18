@@ -1,0 +1,107 @@
+apiVersion: argoproj.io/v1alpha1
+kind: CronWorkflow
+metadata:
+  name: daily-spark-jobs
+  namespace: spark-jobs
+spec:
+  schedules:
+    - "0 2 * * *"
+  timezone: Asia/Bangkok
+  concurrencyPolicy: Forbid
+  workflowSpec:
+    serviceAccountName: workflow-sa
+    entrypoint: submit-all-jobs
+    templates:
+      - name: submit-all-jobs
+        steps:
+          - - name: run-batch-pi
+              template: submit-spark-batch
+            - name: run-streaming-demo
+              template: submit-spark-streaming
+      - name: submit-spark-batch
+        resource:
+          action: create
+          manifest: |
+            apiVersion: sparkoperator.k8s.io/v1beta2
+            kind: SparkApplication
+            metadata:
+              generateName: spark-pi-batch-
+              namespace: spark-jobs
+            spec:
+              type: Python
+              mode: cluster
+              image: spark-app:0.1
+              imagePullPolicy: IfNotPresent
+              mainApplicationFile: local:///app/main.py
+              sparkConf:
+                "spark.eventLog.enabled": "true"
+                "spark.eventLog.dir": "s3a://spark-bucket/logs"
+                "spark.history.fs.logDirectory": "s3a://spark-bucket/logs"
+                "spark.hadoop.fs.s3a.endpoint": "http://minio.spark-staging.svc.cluster.local:9000"
+                "spark.hadoop.fs.s3a.access.key": "admin"
+                "spark.hadoop.fs.s3a.secret.key": "admin123"
+                "spark.hadoop.fs.s3a.aws.credentials.provider": "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider"
+                "spark.hadoop.fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem"
+                "spark.hadoop.fs.s3a.path.style.access": "true"
+                "spark.hadoop.fs.s3a.connection.ssl.enabled": "false"
+                "spark.hadoop.fs.s3a.fast.upload": "true"
+                "spark.hadoop.fs.s3a.attempts.maximum": "3"
+                "spark.eventLog.rolling.enabled": "true"
+                "spark.eventLog.rolling.maxFileSize": "16m" 
+                "spark.hadoop.fs.s3a.committer.name": "directory"
+                "spark.history.fs.cleaner.maxAge": "1d"
+                "spark.history.retainedApplications": "10"
+              restartPolicy:
+                type: Never
+              driver:
+                cores: 1
+                memory: 512m
+                serviceAccount: spark-release-spark-operator-spark
+              executor:
+                cores: 1
+                instances: 1
+                memory: 512m
+      - name: submit-spark-streaming
+        resource:
+          action: create
+          manifest: |
+            apiVersion: sparkoperator.k8s.io/v1beta2
+            kind: SparkApplication
+            metadata:
+              generateName: spark-streaming-
+              namespace: spark-jobs
+            spec:
+              type: Python
+              mode: cluster
+              image: spark-app:0.1
+              imagePullPolicy: IfNotPresent
+              mainApplicationFile: local:///app/test.py
+              sparkConf:
+                "spark.eventLog.enabled": "true"
+                "spark.eventLog.dir": "s3a://spark-bucket/logs"
+                "spark.history.fs.logDirectory": "s3a://spark-bucket/logs"
+                "spark.hadoop.fs.s3a.endpoint": "http://minio.spark-staging.svc.cluster.local:9000"
+                "spark.hadoop.fs.s3a.access.key": "admin"
+                "spark.hadoop.fs.s3a.secret.key": "admin123"
+                "spark.hadoop.fs.s3a.aws.credentials.provider": "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider"
+                "spark.hadoop.fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem"
+                "spark.hadoop.fs.s3a.path.style.access": "true"
+                "spark.hadoop.fs.s3a.connection.ssl.enabled": "false"
+                "spark.hadoop.fs.s3a.fast.upload": "true"
+                "spark.hadoop.fs.s3a.attempts.maximum": "3"
+                "spark.sql.streaming.checkpointLocation": "s3a://spark-bucket/spark-checkpoint"
+                "spark.eventLog.rolling.enabled": "true"
+                "spark.eventLog.rolling.maxFileSize": "16m" 
+                "spark.hadoop.fs.s3a.committer.name": "directory"
+                "spark.history.fs.cleaner.maxAge": "1d"
+                "spark.history.retainedApplications": "10"
+              restartPolicy:
+                type: Always
+              driver:
+                cores: 1
+                memory: 512m
+                serviceAccount: spark-release-spark-operator-spark
+              executor:
+                cores: 1
+                instances: 1
+                memory: 512m
